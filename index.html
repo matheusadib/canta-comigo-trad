@@ -1,0 +1,278 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Canta Comigo - Edição Simplificada</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      .font-roboto-mono {
+        font-family: 'Roboto Mono', monospace;
+      }
+      /* Simple fade-in animation */
+      @keyframes fade-in {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.5s ease-out forwards;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "@google/genai": "https://esm.sh/@google/genai@^1.7.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React, { useState, useCallback, useEffect, useRef } from 'react';
+      import ReactDOM from 'react-dom/client';
+
+      // A API Key foi removida daqui. O Frontend agora é seguro.
+      
+      const e = React.createElement;
+
+      // --- ICONS ---
+      const SearchIcon = ({ className }) => e(
+        'svg', { xmlns: "http://www.w3.org/2000/svg", className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+        e('circle', { cx: "11", cy: "11", r: "8" }),
+        e('line', { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
+      );
+
+      const MusicIcon = ({ className }) => e(
+        'svg', { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "currentColor", className },
+        e('path', { d: "M12 3v10.55c-.59-.34-1.27-.55-2-.55c-2.21 0-4 1.79-4 4s1.79 4 4 4s4-1.79 4-4V7h4V3h-6z" })
+      );
+
+      // --- SERVICE LOGIC (Frontend) ---
+      const getLyricsAnalysis = async (query) => {
+        try {
+          // A chamada agora é para o nosso próprio backend (/api/analise)
+          const response = await fetch('/api/analise', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Erro no servidor: ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          return data;
+
+        } catch (error) {
+          console.error("Error fetching lyrics analysis:", error);
+          throw new Error(error.message || "Não foi possível obter a análise da música. Verifique sua conexão.");
+        }
+      };
+      
+      // --- COMPONENTS ---
+      const SearchBar = ({ onSearch, isLoading }) => {
+        const [query, setQuery] = useState('');
+
+        const handleSubmit = (event) => {
+          event.preventDefault();
+          if (query.trim() && !isLoading) {
+            onSearch(query.trim());
+          }
+        };
+
+        return e('form', { onSubmit: handleSubmit, className: "w-full max-w-2xl mx-auto" },
+          e('div', { className: "relative" },
+            e('input', {
+              type: "text",
+              value: query,
+              onChange: (e) => setQuery(e.target.value),
+              placeholder: "Digite o nome da música e o artista...",
+              disabled: isLoading,
+              className: "w-full pl-5 pr-16 py-4 bg-gray-700/50 border border-gray-600 rounded-full text-white placeholder-gray-400 focus:ring-2 focus:ring-teal-400 focus:border-teal-400 focus:outline-none transition-all duration-300 ease-in-out shadow-lg"
+            }),
+            e('button', {
+              type: "submit",
+              disabled: isLoading,
+              className: "absolute inset-y-0 right-0 flex items-center justify-center w-14 h-full text-gray-300 hover:text-teal-400 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors duration-300"
+            },
+              isLoading
+                ? e('div', { className: "w-5 h-5 border-2 border-t-transparent border-white rounded-full animate-spin" })
+                : e(SearchIcon, { className: "w-6 h-6" })
+            )
+          )
+        );
+      };
+
+      const LyricsDisplay = ({ data }) => {
+        const originalRef = useRef(null);
+        const translationRef = useRef(null);
+        const phoneticsRef = useRef(null);
+        const isSyncing = useRef(false);
+
+        const handleScroll = useCallback((scrolledFrom) => {
+          if (isSyncing.current) return;
+          isSyncing.current = true;
+          
+          let scrollTop = 0;
+          if (scrolledFrom === 'original' && originalRef.current) scrollTop = originalRef.current.scrollTop;
+          if (scrolledFrom === 'translation' && translationRef.current) scrollTop = translationRef.current.scrollTop;
+          if (scrolledFrom === 'phonetics' && phoneticsRef.current) scrollTop = phoneticsRef.current.scrollTop;
+
+          if (scrolledFrom !== 'original' && originalRef.current) originalRef.current.scrollTop = scrollTop;
+          if (scrolledFrom !== 'translation' && translationRef.current) translationRef.current.scrollTop = scrollTop;
+          if (scrolledFrom !== 'phonetics' && phoneticsRef.current) phoneticsRef.current.scrollTop = scrollTop;
+
+          // Use a small timeout to prevent scroll loops on some browsers
+          setTimeout(() => {
+              isSyncing.current = false;
+          }, 50);
+        }, []);
+
+        const Column = ({ title, content, contentRef, onScroll, fontClass = '' }) => e(
+          'div', { className: "bg-gray-800/50 rounded-lg shadow-lg flex flex-col h-full backdrop-blur-sm border border-gray-700" },
+          e('h2', { className: "text-lg font-bold text-teal-300 p-4 border-b border-gray-700 sticky top-0 bg-gray-800/80 backdrop-blur-sm z-10" }, title),
+          e('div', {
+            ref: contentRef,
+            onScroll: onScroll,
+            className: "p-4 space-y-3 overflow-y-auto flex-grow h-[calc(100vh-28rem)] md:h-auto"
+          }, 
+            content.map((line, index) => e('p', { key: index, className: `leading-relaxed ${fontClass}` }, line || ' '))
+          )
+        );
+
+        return e('div', { className: "w-full max-w-7xl mx-auto mt-8 p-4 animate-fade-in" },
+          e('div', { className: "text-center mb-8" },
+            e('h1', { className: "text-4xl font-bold text-white" }, data.title),
+            e('p', { className: "text-xl text-gray-400" }, data.artist)
+          ),
+          e('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-20rem)] md:h-[60vh]" },
+            e(Column, {
+              title: data.language,
+              content: data.lyrics.map(l => l.original),
+              contentRef: originalRef,
+              onScroll: () => handleScroll('original')
+            }),
+            e(Column, {
+              title: "Tradução (Português-BR)",
+              content: data.lyrics.map(l => l.translation),
+              contentRef: translationRef,
+              onScroll: () => handleScroll('translation')
+            }),
+            e(Column, {
+              title: "Pronúncia (Simplificada)",
+              content: data.lyrics.map(l => l.phonetics),
+              contentRef: phoneticsRef,
+              onScroll: () => handleScroll('phonetics'),
+              fontClass: "font-roboto-mono text-gray-300"
+            })
+          )
+        );
+      };
+      
+      // --- APP COMPONENT ---
+      const App = () => {
+        const [lyricsData, setLyricsData] = useState(null);
+        const [isLoading, setIsLoading] = useState(false);
+        const [error, setError] = useState(null);
+        const [isInitial, setIsInitial] = useState(true);
+
+        useEffect(() => {
+          document.body.className = 'bg-gray-900 text-gray-100 antialiased';
+        }, []);
+
+        const handleSearch = useCallback(async (query) => {
+          setIsLoading(true);
+          setError(null);
+          setIsInitial(false);
+          setLyricsData(null);
+          try {
+            const data = await getLyricsAnalysis(query);
+            if (data && data.error) {
+              setError(data.error);
+            } else if (data) {
+              setLyricsData(data);
+            } else {
+               setError("Não foi possível processar a resposta do servidor.");
+            }
+          } catch (e) {
+            setError(e.message || 'Ocorreu um erro desconhecido.');
+          } finally {
+            setIsLoading(false);
+          }
+        }, []);
+
+        const renderContent = () => {
+          if (isLoading) {
+            return e('div', { className: "flex flex-col items-center justify-center text-center text-gray-400 mt-20" },
+              e('div', { className: "w-12 h-12 border-4 border-t-transparent border-teal-400 rounded-full animate-spin mb-4" }),
+              e('p', { className: "text-lg" }, "Analisando a música..."),
+              e('p', { className: "text-sm" }, "Isso pode levar alguns segundos.")
+            );
+          }
+          
+          if (error) {
+            return e('div', { className: `text-center mt-20 p-6 bg-red-900/20 border-red-500 rounded-lg max-w-md mx-auto animate-fade-in` },
+              e('h3', { className: `text-xl font-semibold text-red-400` }, "Oops! Algo deu errado."),
+              e('p', { className: `mt-2 text-red-300` }, error)
+            );
+          }
+
+          if (lyricsData) {
+            return e(LyricsDisplay, { data: lyricsData });
+          }
+
+          if (isInitial) {
+            return e('div', { className: "text-center mt-20 text-gray-500 animate-fade-in" },
+              e(MusicIcon, { className: "w-24 h-24 mx-auto text-gray-700" }),
+              e('h2', { className: "mt-4 text-2xl font-semibold" }, "Bem-vindo ao Canta Comigo"),
+              e('p', { className: "mt-2 max-w-lg mx-auto" }, "Digite uma música e artista para ver a letra original, tradução e pronúncia simplificada lado a lado.")
+            );
+          }
+
+          return null;
+        };
+        
+        return e('div', { className: "min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-teal-900/30" },
+          e('main', { className: "container mx-auto px-4 py-8" },
+            e('header', { className: "text-center mb-8" },
+              e('h1', { className: "text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-sky-400 mb-2" }, "Canta Comigo"),
+              e('p', { className: "text-lg text-gray-400" }, "Edição Simplificada")
+            ),
+            e('div', { className: "sticky top-8 z-20" },
+              e(SearchBar, { onSearch: handleSearch, isLoading: isLoading })
+            ),
+            e('div', { className: "mt-8" },
+              renderContent()
+            )
+          ),
+          e('footer', { className: "text-center py-6 text-gray-600 text-sm" },
+            e('p', null, "Powered by Gemini API. Feito com ❤️ para amantes de música.")
+          )
+        );
+      };
+
+      // --- RENDER THE APP ---
+      const rootElement = document.getElementById('root');
+      const root = ReactDOM.createRoot(rootElement);
+      root.render(e(App));
+
+    </script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

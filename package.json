@@ -1,0 +1,21 @@
+
+{
+  "name": "canta-comigo-seguro",
+  "version": "1.0.0",
+  "description": "App para aprender a cantar músicas com tradução e fonética.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "react",
+    "gemini",
+    "vercel"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/genai": "^0.14.0"
+  }
+}

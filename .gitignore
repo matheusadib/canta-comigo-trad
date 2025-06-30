@@ -1,0 +1,26 @@
+# Arquivo .gitignore para um projeto Vercel com Node.js
+
+# Dependências
+# Esta pasta é criada quando a Vercel ou você rodam `npm install`.
+# Ela pode ser muito grande e não deve NUNCA ser enviada para o GitHub.
+node_modules/
+
+# Arquivos de ambiente
+# Ignora todos os arquivos .env que podem conter chaves de API locais para teste.
+.env*
+
+# Logs
+# Ignora arquivos de log gerados por npm, yarn ou outros processos.
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Pasta de build da Vercel
+# A Vercel usa esta pasta para o processo de deploy. Não precisa estar no repo.
+.vercel/
+
+# Arquivos de sistema operacional
+# Ignora arquivos de metadados criados pelo macOS e Windows.
+.DS_Store
+Thumbs.db
