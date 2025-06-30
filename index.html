@@ -1,11 +1,11 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Canta Comigo - Edição Simplificada</title>
+    <title>Canta Comigo</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,8 +43,6 @@
       import React, { useState, useCallback, useEffect, useRef } from 'react';
       import ReactDOM from 'react-dom/client';
 
-      // A API Key foi removida daqui. O Frontend agora é seguro.
-      
       const e = React.createElement;
 
       // --- ICONS ---
@@ -62,23 +60,17 @@
       // --- SERVICE LOGIC (Frontend) ---
       const getLyricsAnalysis = async (query) => {
         try {
-          // A chamada agora é para o nosso próprio backend (/api/analise)
           const response = await fetch('/api/analise', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query }),
           });
-
           if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || `Erro no servidor: ${response.statusText}`);
           }
-          
           const data = await response.json();
           return data;
-
         } catch (error) {
           console.error("Error fetching lyrics analysis:", error);
           throw new Error(error.message || "Não foi possível obter a análise da música. Verifique sua conexão.");
@@ -88,15 +80,11 @@
       // --- COMPONENTS ---
       const SearchBar = ({ onSearch, isLoading }) => {
         const [query, setQuery] = useState('');
-
         const handleSubmit = (event) => {
           event.preventDefault();
-          if (query.trim() && !isLoading) {
-            onSearch(query.trim());
-          }
+          if (query.trim() && !isLoading) onSearch(query.trim());
         };
-
-        return e('form', { onSubmit: handleSubmit, className: "w-full max-w-2xl mx-auto" },
+        return e('form', { onSubmit: handleSubmit, className: "w-full" },
           e('div', { className: "relative" },
             e('input', {
               type: "text",
@@ -120,68 +108,84 @@
       };
 
       const LyricsDisplay = ({ data }) => {
-        const originalRef = useRef(null);
-        const translationRef = useRef(null);
-        const phoneticsRef = useRef(null);
+        const [activeTab, setActiveTab] = useState('original');
+        const scrollRefs = {
+            original: useRef(null),
+            phonetics: useRef(null),
+            translation: useRef(null)
+        };
         const isSyncing = useRef(false);
 
         const handleScroll = useCallback((scrolledFrom) => {
-          if (isSyncing.current) return;
-          isSyncing.current = true;
-          
-          let scrollTop = 0;
-          if (scrolledFrom === 'original' && originalRef.current) scrollTop = originalRef.current.scrollTop;
-          if (scrolledFrom === 'translation' && translationRef.current) scrollTop = translationRef.current.scrollTop;
-          if (scrolledFrom === 'phonetics' && phoneticsRef.current) scrollTop = phoneticsRef.current.scrollTop;
+            if (isSyncing.current) return;
+            isSyncing.current = true;
+            
+            const scrolledElement = scrollRefs[scrolledFrom].current;
+            if (!scrolledElement) {
+                isSyncing.current = false;
+                return;
+            }
+            const scrollTop = scrolledElement.scrollTop;
 
-          if (scrolledFrom !== 'original' && originalRef.current) originalRef.current.scrollTop = scrollTop;
-          if (scrolledFrom !== 'translation' && translationRef.current) translationRef.current.scrollTop = scrollTop;
-          if (scrolledFrom !== 'phonetics' && phoneticsRef.current) phoneticsRef.current.scrollTop = scrollTop;
+            Object.keys(scrollRefs).forEach(key => {
+                if (key !== scrolledFrom && scrollRefs[key].current) {
+                    scrollRefs[key].current.scrollTop = scrollTop;
+                }
+            });
 
-          // Use a small timeout to prevent scroll loops on some browsers
-          setTimeout(() => {
-              isSyncing.current = false;
-          }, 50);
+            setTimeout(() => { isSyncing.current = false; }, 50);
         }, []);
 
         const Column = ({ title, content, contentRef, onScroll, fontClass = '' }) => e(
-          'div', { className: "bg-gray-800/50 rounded-lg shadow-lg flex flex-col h-full backdrop-blur-sm border border-gray-700" },
-          e('h2', { className: "text-lg font-bold text-teal-300 p-4 border-b border-gray-700 sticky top-0 bg-gray-800/80 backdrop-blur-sm z-10" }, title),
-          e('div', {
-            ref: contentRef,
-            onScroll: onScroll,
-            className: "p-4 space-y-3 overflow-y-auto flex-grow h-[calc(100vh-28rem)] md:h-auto"
-          }, 
-            content.map((line, index) => e('p', { key: index, className: `leading-relaxed ${fontClass}` }, line || ' '))
-          )
+            'div', { className: "bg-gray-800/50 rounded-lg shadow-lg flex flex-col h-full backdrop-blur-sm border border-gray-700" },
+            e('h2', { className: "text-lg font-bold text-teal-300 p-4 border-b border-gray-700 sticky top-0 bg-gray-800/80 backdrop-blur-sm z-10" }, title),
+            e('div', {
+                ref: contentRef,
+                onScroll: onScroll,
+                className: `p-4 space-y-3 overflow-y-auto flex-grow h-[calc(100vh-28rem)] md:h-auto ${fontClass}`
+            }, content.map((line, index) => e('p', { key: index, className: "leading-relaxed" }, line || ' ')))
         );
 
-        return e('div', { className: "w-full max-w-7xl mx-auto mt-8 p-4 animate-fade-in" },
-          e('div', { className: "text-center mb-8" },
-            e('h1', { className: "text-4xl font-bold text-white" }, data.title),
-            e('p', { className: "text-xl text-gray-400" }, data.artist)
-          ),
-          e('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-20rem)] md:h-[60vh]" },
-            e(Column, {
-              title: data.language,
-              content: data.lyrics.map(l => l.original),
-              contentRef: originalRef,
-              onScroll: () => handleScroll('original')
-            }),
-            e(Column, {
-              title: "Tradução (Português-BR)",
-              content: data.lyrics.map(l => l.translation),
-              contentRef: translationRef,
-              onScroll: () => handleScroll('translation')
-            }),
-            e(Column, {
-              title: "Pronúncia (Simplificada)",
-              content: data.lyrics.map(l => l.phonetics),
-              contentRef: phoneticsRef,
-              onScroll: () => handleScroll('phonetics'),
-              fontClass: "font-roboto-mono text-gray-300"
-            })
-          )
+        const TabButton = ({ label, tabKey }) => e(
+            'button',
+            {
+                onClick: () => setActiveTab(tabKey),
+                className: `px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
+                    activeTab === tabKey
+                        ? 'bg-teal-400 text-gray-900'
+                        : 'text-gray-300 hover:bg-gray-700'
+                }`
+            },
+            label
+        );
+
+        const MobileColumn = ({ content, fontClass = '' }) => e(
+            'div', { className: `p-4 space-y-3 ${fontClass}` },
+            content.map((line, index) => e('p', { key: index, className: "leading-relaxed" }, line || ' '))
+        );
+
+        return e('div', { className: "w-full max-w-7xl mx-auto mt-2 md:mt-8 p-4 animate-fade-in" },
+            e('div', { className: "text-center mb-8" },
+                e('h1', { className: "text-4xl font-bold text-white" }, data.title),
+                e('p', { className: "text-xl text-gray-400" }, data.artist)
+            ),
+            e('div', { className: "hidden md:grid md:grid-cols-3 gap-6 h-[calc(100vh-20rem)] md:h-[60vh]" },
+                e(Column, { title: data.language, content: data.lyrics.map(l => l.original), contentRef: scrollRefs.original, onScroll: () => handleScroll('original') }),
+                e(Column, { title: "Pronúncia (Simplificada)", content: data.lyrics.map(l => l.phonetics), contentRef: scrollRefs.phonetics, onScroll: () => handleScroll('phonetics'), fontClass: "font-roboto-mono text-gray-300" }),
+                e(Column, { title: "Tradução (Português-BR)", content: data.lyrics.map(l => l.translation), contentRef: scrollRefs.translation, onScroll: () => handleScroll('translation') })
+            ),
+            e('div', { className: "md:hidden bg-gray-800/50 rounded-lg shadow-lg backdrop-blur-sm border border-gray-700" },
+                e('div', { className: "flex justify-center p-2 border-b border-gray-700 space-x-2" },
+                    e(TabButton, { label: data.language, tabKey: 'original' }),
+                    e(TabButton, { label: "Pronúncia", tabKey: 'phonetics' }),
+                    e(TabButton, { label: "Tradução", tabKey: 'translation' })
+                ),
+                e('div', { className: "h-[calc(100vh-28rem)] overflow-y-auto" },
+                    activeTab === 'original' && e(MobileColumn, { content: data.lyrics.map(l => l.original) }),
+                    activeTab === 'phonetics' && e(MobileColumn, { content: data.lyrics.map(l => l.phonetics), fontClass: "font-roboto-mono text-gray-300" }),
+                    activeTab === 'translation' && e(MobileColumn, { content: data.lyrics.map(l => l.translation) })
+                )
+            )
         );
       };
       
@@ -199,7 +203,9 @@
         const handleSearch = useCallback(async (query) => {
           setIsLoading(true);
           setError(null);
-          setIsInitial(false);
+          if (isInitial) {
+            setIsInitial(false);
+          }
           setLyricsData(null);
           try {
             const data = await getLyricsAnalysis(query);
@@ -215,7 +221,7 @@
           } finally {
             setIsLoading(false);
           }
-        }, []);
+        }, [isInitial]);
 
         const renderContent = () => {
           if (isLoading) {
@@ -225,41 +231,49 @@
               e('p', { className: "text-sm" }, "Isso pode levar alguns segundos.")
             );
           }
-          
           if (error) {
-            return e('div', { className: `text-center mt-20 p-6 bg-red-900/20 border-red-500 rounded-lg max-w-md mx-auto animate-fade-in` },
+            return e('div', { className: `text-center mt-8 p-6 bg-red-900/20 border border-red-500 rounded-lg max-w-md mx-auto animate-fade-in` },
               e('h3', { className: `text-xl font-semibold text-red-400` }, "Oops! Algo deu errado."),
               e('p', { className: `mt-2 text-red-300` }, error)
             );
           }
-
           if (lyricsData) {
             return e(LyricsDisplay, { data: lyricsData });
           }
-
-          if (isInitial) {
-            return e('div', { className: "text-center mt-20 text-gray-500 animate-fade-in" },
-              e(MusicIcon, { className: "w-24 h-24 mx-auto text-gray-700" }),
-              e('h2', { className: "mt-4 text-2xl font-semibold" }, "Bem-vindo ao Canta Comigo"),
-              e('p', { className: "mt-2 max-w-lg mx-auto" }, "Digite uma música e artista para ver a letra original, tradução e pronúncia simplificada lado a lado.")
-            );
-          }
-
           return null;
         };
         
+        if (isInitial) {
+            return e('div', { className: "min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-teal-900/30 flex flex-col" },
+                e('main', { className: "flex-grow flex flex-col items-center justify-center p-4 text-center" },
+                    e('header', { className: "mb-8 animate-fade-in" },
+                      e('h1', { className: "text-5xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-sky-400" }, "Canta Comigo")
+                    ),
+                    e('div', { className: "mb-8 text-gray-400 animate-fade-in", style: { animationDelay: '200ms' } },
+                        e(MusicIcon, { className: "w-16 h-16 mx-auto text-gray-700 mb-4" }),
+                        e('p', { className: "mt-2 max-w-lg mx-auto" }, "Aprenda a cantar suas músicas favoritas. Digite o nome da música e o artista para ver a letra original, a pronúncia simplificada e a tradução lado a lado.")
+                    ),
+                    e('div', { className: "w-full max-w-2xl animate-fade-in", style: { animationDelay: '400ms' } },
+                        e(SearchBar, { onSearch: handleSearch, isLoading: isLoading })
+                    )
+                ),
+                e('footer', { className: "text-center py-6 text-gray-600 text-sm" },
+                    e('p', null, "Powered by Gemini API. Feito com ❤️ para amantes de música.")
+                )
+            );
+        }
+
         return e('div', { className: "min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-teal-900/30" },
-          e('main', { className: "container mx-auto px-4 py-8" },
-            e('header', { className: "text-center mb-8" },
-              e('h1', { className: "text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-sky-400 mb-2" }, "Canta Comigo"),
-              e('p', { className: "text-lg text-gray-400" }, "Edição Simplificada")
-            ),
-            e('div', { className: "sticky top-8 z-20" },
-              e(SearchBar, { onSearch: handleSearch, isLoading: isLoading })
-            ),
-            e('div', { className: "mt-8" },
-              renderContent()
-            )
+          e('header', { className: "sticky top-0 z-20 bg-gray-900/80 backdrop-blur-sm shadow-md py-4" },
+             e('div', { className: "container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4" },
+               e('h1', { className: "text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-sky-400 flex-shrink-0" }, "Canta Comigo"),
+               e('div', { className: "w-full sm:max-w-2xl" }, 
+                  e(SearchBar, { onSearch: handleSearch, isLoading: isLoading })
+               )
+             )
+          ),
+          e('main', { className: "container mx-auto px-4 py-2 md:py-8" },
+            renderContent()
           ),
           e('footer', { className: "text-center py-6 text-gray-600 text-sm" },
             e('p', null, "Powered by Gemini API. Feito com ❤️ para amantes de música.")
